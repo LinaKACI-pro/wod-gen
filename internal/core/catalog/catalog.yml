@@ -1,0 +1,51 @@
+moves:
+  - name: Row
+    needs_one_of: ["rower"]
+    tags: ["engine"]
+    weight: 1.2
+    ranges:
+      beginner:     { meters: [400, 900] }
+      intermediate: { meters: [500, 1000] }
+      advanced:     { meters: [700, 1200] }
+
+  - name: Run
+    tags: ["engine"]
+    weight: 1.0
+    ranges:
+      beginner:     { meters: [300, 800] }
+      intermediate: { meters: [400, 1000] }
+      advanced:     { meters: [600, 1200] }
+
+  - name: Sled Push
+    needs_one_of: ["sled"]
+    tags: ["strength"]
+    weight: 1.0
+    ranges:
+      beginner:     { meters: [10, 30] }
+      intermediate: { meters: [15, 40] }
+      advanced:     { meters: [20, 50] }
+
+  - name: Wall Balls
+    needs_one_of: ["wallball"]
+    tags: ["mixed"]
+    weight: 0.8
+    ranges:
+      beginner:     { reps: [10, 20] }
+      intermediate: { reps: [15, 30] }
+      advanced:     { reps: [20, 35] }
+
+  - name: Burpees Broad Jump
+    tags: ["mixed"]
+    weight: 0.8
+    ranges:
+      beginner: { meters: [10, 20] }
+      intermediate: { meters: [20, 30] }
+      advanced: { meters: [30, 40] }
+
+  - name: Push-ups
+    tags: ["strength"]
+    weight: 0.7
+    ranges:
+      beginner: { reps: [10, 20] }
+      intermediate: { reps: [15, 30] }
+      advanced: { reps: [20, 40] }

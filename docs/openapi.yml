@@ -1,0 +1,145 @@
+openapi: 3.0.0
+info:
+  title: Hyrox WOD Generator API
+  description: API to generate and retrieve Hyrox-style workouts
+  version: 0.1.0
+servers:
+  - url: /api/v1
+
+paths:
+  /wod/generate:
+    post:
+      operationId: GenerateWod
+      description: Generate a new WOD based on constraints
+      requestBody:
+        $ref: "#/components/requestBodies/GenerateWodRequest"
+      responses:
+        "200":
+          description: WOD generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wod"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  requestBodies:
+    GenerateWodRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GenerateWodParams"
+
+  schemas:
+    GenerateWodParams:
+      type: object
+      required: [level, duration_min]
+      properties:
+        level:
+          type: string
+          enum: [beginner, intermediate, advanced]
+          example: intermediate
+          x-oapi-codegen-extra-tags:
+            validate: required,oneof=beginner intermediate advanced
+        duration_min:
+          type: integer
+          minimum: 15
+          maximum: 120
+          example: 45
+          x-oapi-codegen-extra-tags:
+            validate: required,min=15,max=120
+        equipment:
+          type: array
+          items:
+            type: string
+          example: ["rower","sled","burpee broad jump"]
+        seed:
+          type: string
+          example: demo-seed-123
+
+    Block:
+      type: object
+      description: A workout block (movement + params)
+      properties:
+        name:
+          type: string
+          example: Row
+        params:
+          type: object
+          additionalProperties: true
+          example:
+            meters: 1000
+
+    Wod:
+      type: object
+      required: [id, created_at, level, duration_min, blocks, seed, generator_version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-09-06T12:00:00Z"
+        level:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        duration_min:
+          type: integer
+        equipment:
+          type: array
+          items: { type: string }
+        seed:
+          type: string
+        generator_version:
+          type: string
+          example: "v1"
+        blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Block"
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: "invalid request"
+        request_id:
+          type: string
+          nullable: true
+          example: "b1f6a2d3-..."

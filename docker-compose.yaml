@@ -1,0 +1,16 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: build/Dockerfile
+    image: wod-gen:local
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      API_KEYS: "devkey"
+      RATE_LIMITER_BURST: "15"
+      RATE_LIMITER_REQUESTS_PER_SECOND: "30"
+      RATE_LIMITER_STRATEGY: "token"
+      RATE_LIMITER_ENABLED: "true"
+      ENV: "dev"

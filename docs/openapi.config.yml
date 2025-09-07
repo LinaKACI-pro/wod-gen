@@ -1,0 +1,7 @@
+package: handlers
+generate:
+  gin-server: true
+  embedded-spec: false
+  strict-server: true
+  models: true
+output: ../internal/handlers/api.gen.go

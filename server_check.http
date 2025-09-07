@@ -1,0 +1,75 @@
+@base = http://localhost:8080
+@token = devkey
+
+###
+# Health
+GET {{base}}/healthz
+
+###
+# Ready
+GET {{base}}/readyz
+
+
+################################
+#      API v1 — protected      #
+################################
+
+###
+# 200 — Happy path (deterministic via seed)
+# Relance exactement cette requête: les "blocks" doivent être identiques.
+POST {{base}}/api/v1/wod/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "level": "intermediate",
+  "duration_min": 35,
+  "equipment": ["sled", "kb"],
+  "seed": "abcd-1234"
+}
+
+###
+# 200 — Happy path (autre seed pour voir un autre WOD)
+POST {{base}}/api/v1/wod/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "level": "beginner",
+  "duration_min": 20,
+  "seed": "efgh-5678"
+}
+
+
+###
+# 400 — invalid enum (level)
+POST {{base}}/api/v1/wod/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "level": "expert",
+  "duration_min": 35
+}
+
+###
+# 400 — duration too small (min=15)
+POST {{base}}/api/v1/wod/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "level": "advanced",
+  "duration_min": 5
+}
+
+
+###
+# 401 — missing auth (envoie un body valide sans Authorization)
+POST {{base}}/api/v1/wod/generate
+Content-Type: application/json
+
+{
+  "level": "intermediate",
+  "duration_min": 30
+}
