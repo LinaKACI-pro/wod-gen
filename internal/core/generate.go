@@ -47,7 +47,6 @@ func NewCatalog(raw []byte) (*Catalog, error) {
 	if err := yaml.Unmarshal(raw, &c); err != nil {
 		return nil, fmt.Errorf("parse catalog: %w", err)
 	}
-	// defaults légers
 	for i := range c.Moves {
 		if c.Moves[i].Weight == 0 {
 			c.Moves[i].Weight = 1.0
@@ -83,7 +82,6 @@ func (c *Catalog) Generate(ctx context.Context, level string, durationMin int, e
 
 	avail := filterByEquipment(c.Moves, equipment)
 	if len(avail) == 0 {
-		// fallback : mouvements sans équipement
 		avail = filterNoEquipment(c.Moves)
 		if len(avail) == 0 {
 			return models.Wod{}, common.ErrNoMoves

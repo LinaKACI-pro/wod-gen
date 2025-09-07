@@ -35,6 +35,7 @@ moves:
 `
 
 func TestGenerate_DeterministicWithSeed(t *testing.T) {
+	t.Parallel()
 	cat, err := NewCatalog([]byte(miniCatalogYAML))
 	if err != nil {
 		t.Fatalf("NewCatalog error: %v", err)
@@ -45,24 +46,20 @@ func TestGenerate_DeterministicWithSeed(t *testing.T) {
 	duration := 45
 	equip := []string{"dumbbell"}
 
-	// 1ère génération
 	w1, err := cat.Generate(context.Background(), level, duration, equip, &seed)
 	if err != nil {
 		t.Fatalf("Generate #1 error: %v", err)
 	}
 
-	// 2ème génération (mêmes inputs)
 	w2, err := cat.Generate(context.Background(), level, duration, equip, &seed)
 	if err != nil {
 		t.Fatalf("Generate #2 error: %v", err)
 	}
 
-	// mêmes blocs attendus à seed identique
 	if !reflect.DeepEqual(w1.Blocks, w2.Blocks) {
 		t.Fatalf("expected identical blocks with same seed, got different:\n%v\nvs\n%v", w1.Blocks, w2.Blocks)
 	}
 
-	// vérifs légères : level normalisé, seed renvoyée telle quelle, durée respectée
 	if w1.Level != "intermediate" {
 		t.Fatalf("expected level 'intermediate', got %q", w1.Level)
 	}
@@ -75,6 +72,7 @@ func TestGenerate_DeterministicWithSeed(t *testing.T) {
 }
 
 func TestGenerate_InvalidLevel(t *testing.T) {
+	t.Parallel()
 	cat, err := NewCatalog([]byte(miniCatalogYAML))
 	if err != nil {
 		t.Fatalf("NewCatalog error: %v", err)
