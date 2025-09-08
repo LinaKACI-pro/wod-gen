@@ -1,4 +1,4 @@
-//nolint:gocrtic // main function
+//nolint:gocritic // main function
 package main
 
 import (
@@ -57,7 +57,11 @@ func main() {
 		logger.Error("initDb: ", "err", err)
 		return
 	}
-	defer database.Close()
+	defer func() {
+		if err = database.Close(); err != nil {
+			logger.Warn("failed to close rows: ", "err", err)
+		}
+	}()
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()

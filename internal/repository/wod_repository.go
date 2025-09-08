@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/LinaKACI-pro/wod-gen/internal/models"
 	"github.com/lib/pq"
@@ -51,7 +52,11 @@ func (r *WodRepository) ListWods(ctx context.Context, limit, offset int) ([]mode
 	if err != nil {
 		return nil, fmt.Errorf("db.QueryContext: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err = rows.Close(); err != nil {
+			slog.Warn("failed to close rows: ", "err: ", err)
+		}
+	}()
 
 	var wods []models.Wod
 	for rows.Next() {
