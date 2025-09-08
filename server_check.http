@@ -1,5 +1,7 @@
-@base = http://localhost:8080
-@token = devkey
+@local = http://localhost:8080/
+@prod = https://wod-gen.fly.dev/
+@base = {{local}}
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzU3NDE3NjY0LCJpYXQiOjE3NTczMzEyNjR9.aLv1dwzSersSN63HJwsDErYVjDq9NnKJ_DyVsaebjAg
 
 ###
 # Health

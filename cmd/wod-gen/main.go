@@ -45,24 +45,17 @@ func main() {
 		slog.String("rate_strategy", cfg.RateLimit.Strategy),
 	)
 
-	// ---- Contexte arrêt gracieux ----
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// ---- Auth (API keys hashées) ----
-	am := pkg.NewManagerFromSlice(cfg.Auth.APIKeys)
-
-	// ---- Gin / Router ----
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 
-	// si derrière proxy/ingress (Cloud Run, etc.), configure au besoin :
 	err := r.SetTrustedProxies(nil)
 	if err != nil {
 		log.Printf("r.SetTrustedProxies: %v\n", err)
 	}
 
-	// Middlewares globaux
 	r.Use(pkg.RecoveryMiddleware(logger))
 	r.Use(pkg.RequestID())
 	r.Use(pkg.Logging(logger))
@@ -78,7 +71,10 @@ func main() {
 
 	// API v1 (auth + rate-limit)
 	api := r.Group("/api/v1")
-	api.Use(pkg.AuthBearer(am, logger))
+
+	jwtManager := pkg.NewJWTManager(cfg.Auth.JWTSecret, 24*time.Hour)
+	api.Use(pkg.AuthJWT(jwtManager, logger))
+
 	if cfg.RateLimit.Enabled {
 		rl := pkg.NewLimiter(&cfg.RateLimit)
 		defer rl.Stop()
@@ -87,7 +83,7 @@ func main() {
 
 	swagger, err := handlers.GetSwagger()
 	if err != nil {
-		log.Fatalf("handlers.GetSwagger: %v", err)
+		logger.Error("handlers.GetSwagger: ", "err", err)
 		return
 	}
 
@@ -96,7 +92,7 @@ func main() {
 
 	c, err := core.NewCatalog(catalog.Raw)
 	if err != nil {
-		log.Fatalf("catalog.NewCatalog: %v", err)
+		logger.Error("catalog.NewCatalog: ", "err", err)
 		return
 	}
 
@@ -115,7 +111,6 @@ func main() {
 		MaxHeaderBytes:    cfg.HTTP.MaxHeaderBytes,
 	}
 
-	// ---- Lancement + arrêt gracieux ----
 	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("listening", slog.String("addr", srv.Addr))

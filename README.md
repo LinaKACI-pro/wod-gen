@@ -9,7 +9,7 @@ A **Go** API that generates reproducible Workouts of the Day (WODs) based on use
 - Configurable duration between **15 and 120 minutes**.
 - Takes available equipment into account (falls back to bodyweight moves if none).
 - Deterministic results with a `seed` (re-run the same WOD).
-- Secured API: **Bearer token authentication** + **rate limiting**.
+- Secured API: **JWT authentication** + **rate limiting**.
 - Healthchecks available (`/healthz`, `/readyz`).
 
 ## 📦 Installation & Run
@@ -23,13 +23,44 @@ make lint
 
 # run locally (default port: 8080)
 go run ./cmd/wod-gen
-````
+```
 
 Main environment variables (see `internal/config`):
 
-* `HTTP_PORT`: HTTP port (e.g. `8080`)
-* `AUTH_API_KEYS`: list of API keys (hashed)
+* `PORT`: HTTP port (e.g. `8080`)
+* `AUTH_JWT_SECRET`: secret for signing JWT tokens (HS256)
 * `RATE_LIMIT_STRATEGY`: rate limiting strategy
+
+## 🔑 JWT
+
+Generate a JWT locally with the CLI:
+
+```bash
+openssl rand -hex 32
+export AUTH_JWT_SECRET=<secret>
+go run cmd/gen-jwt/main.go user123
+```
+
+Use it in requests:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/wod/generate \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"level":"intermediate","duration_min":45}'
+```
+
+## ☁️ Deployment on Fly.io
+
+```bash
+# set secret for JWT
+flyctl secrets set AUTH_JWT_SECRET=$(openssl rand -hex 32)
+
+# deploy
+flyctl deploy
+```
+
+App will be available at https://wod-gen.fly.dev/.
 
 ## 🔌 Endpoints
 

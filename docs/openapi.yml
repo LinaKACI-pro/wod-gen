@@ -86,6 +86,7 @@ components:
         seed:
           type: string
           example: demo-seed-123
+      additionalProperties: false
 
     Block:
       type: object

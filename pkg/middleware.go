@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/LinaKACI-pro/wod-gen/internal/config"
@@ -48,34 +49,6 @@ func toString(v any) string {
 		return s
 	}
 	return ""
-}
-
-func AuthBearer(s *SecManager, logger *slog.Logger) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		pr, err := s.ValidateBearer(c.GetHeader("Authorization"))
-		if err != nil {
-			status := http.StatusUnauthorized
-			if errors.Is(err, ErrInvalid) {
-				status = http.StatusForbidden
-			}
-			reqID, _ := c.Get("request_id")
-			if logger != nil {
-				logger.Warn("auth_failed",
-					slog.String("route", c.FullPath()),
-					slog.Int("status", status),
-					slog.String("request_id", toString(reqID)),
-				)
-			}
-			c.AbortWithStatusJSON(status, gin.H{
-				"code":       status,
-				"message":    err.Error(),
-				"request_id": toString(reqID),
-			})
-			return
-		}
-		c.Set("key_id", pr.KeyID)
-		c.Next()
-	}
 }
 
 func SecurityHeaders(enableHSTS bool) gin.HandlerFunc {
@@ -124,6 +97,28 @@ func RecoveryMiddleware(logger *slog.Logger) gin.HandlerFunc {
 				})
 			}
 		}()
+		c.Next()
+	}
+}
+
+func AuthJWT(m *JWTManager, logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+		claims, err := m.Verify(tokenStr)
+		if err != nil {
+			logger.Warn("invalid jwt", slog.String("err", err.Error()))
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		// Stocker l’utilisateur dans le contexte
+		c.Set("sub", claims.Subject)
 		c.Next()
 	}
 }

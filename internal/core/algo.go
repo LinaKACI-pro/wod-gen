@@ -1,4 +1,4 @@
-//nolint:gosec // todo: documente
+//nolint:gosec // deterministic non-crypto PRNG is intended
 package core
 
 import (
@@ -10,6 +10,12 @@ import (
 	"strings"
 )
 
+const (
+	defaultReps     = 10
+	repeatPenalty   = 0.1 // reduce weight if same move as last
+	minParamDefault = 1
+)
+
 func blocksForDuration(level string, d int) int {
 	switch level {
 	case Beginner:
@@ -18,7 +24,6 @@ func blocksForDuration(level string, d int) int {
 		} else if d <= 45 {
 			return 6
 		}
-
 		return 7
 	case Advanced:
 		if d <= 30 {
@@ -26,7 +31,6 @@ func blocksForDuration(level string, d int) int {
 		} else if d <= 60 {
 			return 8
 		}
-
 		return 10
 	default: // Intermediate
 		if d <= 30 {
@@ -34,7 +38,6 @@ func blocksForDuration(level string, d int) int {
 		} else if d <= 50 {
 			return 7
 		}
-
 		return 8
 	}
 }
@@ -79,7 +82,7 @@ func weightedPick(rnd *rand.Rand, avail []move, last string) move {
 	for i, m := range avail {
 		w := m.Weight
 		if m.Name == last {
-			w *= 0.1
+			w *= repeatPenalty
 		}
 		total += w
 		acc[i] = total
@@ -90,19 +93,20 @@ func weightedPick(rnd *rand.Rand, avail []move, last string) move {
 			return avail[i]
 		}
 	}
+	// fallback: should not happen
 	return avail[len(avail)-1]
 }
 
 func pickParams(rnd *rand.Rand, ranges map[string]rng) map[string]interface{} {
 	out := make(map[string]interface{}, len(ranges))
 	if len(ranges) == 0 {
-		out["reps"] = 10
+		out["reps"] = defaultReps
 		return out
 	}
 	for k, mm := range ranges {
 		minParam, maxParam := mm[0], mm[1]
-		if minParam < 1 {
-			minParam = 1
+		if minParam < minParamDefault {
+			minParam = minParamDefault
 		}
 		if maxParam < minParam {
 			maxParam = minParam
@@ -111,13 +115,13 @@ func pickParams(rnd *rand.Rand, ranges map[string]rng) map[string]interface{} {
 		if maxParam > minParam {
 			val = minParam + rnd.Intn(maxParam-minParam+1)
 		}
-		if val < 1 {
-			val = 1
+		if val < minParamDefault {
+			val = minParamDefault
 		}
 		out[k] = val
 	}
 	if len(out) == 0 {
-		out["reps"] = 10
+		out["reps"] = defaultReps
 	}
 	return out
 }
@@ -138,4 +142,8 @@ func seedHash(seed string, dur int, level string, equip []string) int64 {
 	return int64(u)
 }
 
-func cloneStrings(s []string) []string { out := make([]string, len(s)); copy(out, s); return out }
+func cloneStrings(s []string) []string {
+	out := make([]string, len(s))
+	copy(out, s)
+	return out
+}

@@ -7,8 +7,10 @@ MIGRATION_DIR = db/migrations
 DOCKER_REGISTRY ?= local
 TAG ?= latest
 LATEST  := latest
+BASE_URL ?= http://localhost:8080/api/v1/wod/generate
+TOKEN ?= devkey
 
-.PHONY: all build migrate-up migrate-down run run-binary docker-build docker-push docker-run-postgres docker-run-app docker-run docker-compose-dev docker-compose-prod clean
+.PHONY: all build migrate-up migrate-down run run-binary docker-build docker-push docker-run-postgres docker-run-app docker-run docker-compose-dev docker-compose-prod test-k6 clean
 
 all: build migrate-up run
 
@@ -18,14 +20,15 @@ tools:
 	@go install mvdan.cc/gofumpt@$(LATEST)
 	@go install golang.org/x/vuln/cmd/govulncheck@$(LATEST)
 	@go install github.com/kisielk/errcheck@$(LATEST)
+	@go install mvdan.cc/gofumpt@$(LATEST)
 
 migrate-up:
 	goose -dir ${MIGRATION_DIR} postgres "${DB_DSN}" up
-	@echo "✅ Migrations applied successfully!"
+	@echo "Migrations applied successfully!"
 
 migrate-down:
 	goose -dir ${MIGRATION_DIR} postgres "${DB_DSN}" down
-	@echo "✅ Migrations reverted successfully!"
+	@echo "Migrations reverted successfully!"
 
 test:
 	go test -coverprofile=coverage.out -covermode=atomic ./...
@@ -33,17 +36,25 @@ test:
 test-race:
 	go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
+# exemple : make test-k6 BASE_URL=http://localhost:8080/api/v1/wod/generate TOKEN="$(go run cmd/gen-jwt/main.go user123)"
+test-k6:
+	@for f in tests/*.js; do \
+		echo "=== Running $$f ==="; \
+		k6 run --env BASE_URL=$(BASE_URL) --env TOKEN=$(TOKEN) $$f || exit 1; \
+	done
+
 fmt:
+	gofumpt -w .
 	go fmt ./...
 
 vet:
 	go vet ./...
 
 lint:
-	@echo "→ golangci-lint"
+	@echo "-> golangci-lint"
 	@golangci-lint config verify -c golangci.yml
 	@golangci-lint run -c golangci.yml ./...
-	@echo "→ govulncheck (optionnel)"; command -v govulncheck >/dev/null 2>&1 && govulncheck ./... || true
+	@echo "-> govulncheck"; command -v govulncheck >/dev/null 2>&1 && govulncheck ./... || true
 
 # Docker targets
 docker-build:

@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
-	"github.com/LinaKACI-pro/wod-gen/internal/common"
 	"github.com/LinaKACI-pro/wod-gen/internal/models"
+	"github.com/bytedance/gopkg/util/logger"
 )
 
 type Generator interface {
@@ -25,7 +24,7 @@ func (server *Server) GenerateWod(ctx context.Context, req GenerateWodRequestObj
 	if req.Body == nil {
 		return &GenerateWod400JSONResponse{
 			Code:    http.StatusBadRequest,
-			Message: common.ErrMissingBody.Error(),
+			Message: "missing body",
 		}, nil
 	}
 
@@ -38,9 +37,11 @@ func (server *Server) GenerateWod(ctx context.Context, req GenerateWodRequestObj
 
 	wod, err := server.gen.Generate(ctx, string(req.Body.Level), req.Body.DurationMin, equipment, req.Body.Seed)
 	if err != nil {
+		logger.Error("server.gen.Generate failed", "err", err)
+
 		return &GenerateWod400JSONResponse{
 			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf("invalid request: %v", err),
+			Message: "invalid request",
 		}, nil
 	}
 

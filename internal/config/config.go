@@ -5,7 +5,8 @@ import (
 )
 
 type AuthConfig struct {
-	APIKeys []string `env:"API_KEYS" required:"true"`
+	JWTSecret string   `env:"AUTH_JWT_SECRET" required:"true"`
+	APIKeys   []string `env:"API_KEYS" required:"true"`
 }
 
 type RateLimiterConfig struct {

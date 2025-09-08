@@ -83,7 +83,6 @@ linters:
     #- nlreturn
     - noctx
     - nolintlint
-    - paralleltest
     - predeclared
     - revive
     - rowserrcheck
@@ -98,10 +97,13 @@ linters:
     - whitespace
 
 issues:
-  # Show only new issues created after git revision: e016c66
   new-from-rev: e016c66
   exclude-generated: strict
+  exclude-dirs:
+    - cmd/gen-jwt
   exclude-rules:
     - path: ^docs/
       linters: [ errcheck, staticcheck, govet, revive ]
       text: ".*"
+    - path: _test\.go$
+      linters: [err113, dogsled]

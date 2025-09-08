@@ -2,11 +2,11 @@ package core
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/LinaKACI-pro/wod-gen/internal/common"
+	"github.com/stretchr/testify/require"
 )
 
 const miniCatalogYAML = `
@@ -71,20 +71,84 @@ func TestGenerate_DeterministicWithSeed(t *testing.T) {
 	}
 }
 
+func TestNewCatalog_InvalidYAML(t *testing.T) {
+	raw := []byte(`:: invalid yaml ::`)
+	c, err := NewCatalog(raw)
+	require.Error(t, err)
+	require.Nil(t, c)
+}
+
 func TestGenerate_InvalidLevel(t *testing.T) {
-	t.Parallel()
-	cat, err := NewCatalog([]byte(miniCatalogYAML))
-	if err != nil {
-		t.Fatalf("NewCatalog error: %v", err)
-	}
+	raw := []byte(`
+moves:
+  - name: Push-ups
+    weight: 1
+`)
+	c, err := NewCatalog(raw)
+	require.NoError(t, err)
 
-	_, err = cat.Generate(context.Background(), "novice", 30, nil, nil)
-	if err == nil {
-		t.Fatalf("expected error for invalid level, got nil")
-	}
+	_, err = c.Generate(context.Background(), "invalid-level", 30, nil, nil)
+	require.Error(t, err)
+	require.IsType(t, common.InvalidDataError{}, err)
+}
 
-	var inv common.InvalidDataError
-	if !errors.As(err, &inv) {
-		t.Fatalf("expected InvalidDataError, got %T: %v", err, err)
-	}
+func TestGenerate_DurationOutOfRange(t *testing.T) {
+	raw := []byte(`
+moves:
+  - name: Squats
+    weight: 1
+`)
+	c, err := NewCatalog(raw)
+	require.NoError(t, err)
+
+	_, err = c.Generate(context.Background(), Beginner, 5, nil, nil) // trop petit
+	require.Error(t, err)
+	require.Equal(t, common.ErrDuration, err)
+
+	_, err = c.Generate(context.Background(), Beginner, 200, nil, nil) // trop grand
+	require.Error(t, err)
+	require.Equal(t, common.ErrDuration, err)
+}
+
+func TestGenerate_EmptyCatalog(t *testing.T) {
+	c := &Catalog{Moves: []move{}}
+	_, err := c.Generate(context.Background(), Beginner, 30, nil, nil)
+	require.Error(t, err)
+	require.Equal(t, common.ErrEmptyCatalog, err)
+}
+
+func TestGenerate_NoMovesAvailable(t *testing.T) {
+	raw := []byte(`
+moves:
+  - name: Bike
+    needs_one_of: ["bike"]
+    weight: 1
+`)
+	c, err := NewCatalog(raw)
+	require.NoError(t, err)
+
+	// On demande un équipement inexistant → aucun move dispo
+	_, err = c.Generate(context.Background(), Beginner, 30, []string{"rower"}, nil)
+	require.Error(t, err)
+	require.Equal(t, common.ErrNoMoves, err)
+}
+
+func TestGenerate_Success(t *testing.T) {
+	raw := []byte(`
+moves:
+  - name: Push-ups
+    weight: 1
+    ranges:
+      beginner:
+        reps: [5, 5]
+`)
+	c, err := NewCatalog(raw)
+	require.NoError(t, err)
+
+	wod, err := c.Generate(context.Background(), Beginner, 20, nil, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, wod.Blocks)
+	require.Equal(t, Beginner, wod.Level)
+	require.Equal(t, 20, wod.DurationMin)
+	require.NotEmpty(t, wod.Seed)
 }
