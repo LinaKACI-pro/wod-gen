@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/LinaKACI-pro/wod-gen/internal/core/catalog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +23,7 @@ func TestBlocksForDuration(t *testing.T) {
 }
 
 func TestFilterByEquipment(t *testing.T) {
-	list := []move{
+	list := []catalog.Move{
 		{Name: "Run"},
 		{Name: "Row", NeedsOneOf: []string{"rower"}},
 		{Name: "Bike", NeedsOneOf: []string{"bike"}},
@@ -39,7 +40,7 @@ func TestFilterByEquipment(t *testing.T) {
 }
 
 func TestFilterNoEquipment(t *testing.T) {
-	list := []move{
+	list := []catalog.Move{
 		{Name: "Run"},
 		{Name: "Row", NeedsOneOf: []string{"rower"}},
 	}
@@ -49,7 +50,7 @@ func TestFilterNoEquipment(t *testing.T) {
 }
 
 func TestWeightedPick(t *testing.T) {
-	avail := []move{
+	avail := []catalog.Move{
 		{Name: "A", Weight: 1},
 		{Name: "B", Weight: 100}, // devrait sortir quasi toujours
 	}
@@ -66,7 +67,7 @@ func TestPickParams_Defaults(t *testing.T) {
 	require.Equal(t, defaultReps, got["reps"])
 
 	// Cas avec bornes valides
-	got = pickParams(rnd, map[string]rng{"reps": {5, 5}})
+	got = pickParams(rnd, map[string]catalog.Rng{"reps": {5, 5}})
 	require.Equal(t, 5, got["reps"])
 }
 

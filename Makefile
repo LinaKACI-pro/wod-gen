@@ -8,7 +8,7 @@ DOCKER_REGISTRY ?= local
 TAG ?= latest
 LATEST  := latest
 BASE_URL ?= http://localhost:8080/api/v1/wod/generate
-TOKEN ?= devkey
+TOKEN ?= eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzU3NDM3NDY4LCJpYXQiOjE3NTczNTEwNjh9.FsE9SDr-StQIGN0b3aOO-89VF8-cI-ohydROaqsd6zM
 
 .PHONY: all build migrate-up migrate-down run run-binary docker-build docker-push docker-run-postgres docker-run-app docker-run docker-compose-dev docker-compose-prod test-k6 clean
 
@@ -21,6 +21,7 @@ tools:
 	@go install golang.org/x/vuln/cmd/govulncheck@$(LATEST)
 	@go install github.com/kisielk/errcheck@$(LATEST)
 	@go install mvdan.cc/gofumpt@$(LATEST)
+	@go install github.com/daixiang0/gci@latest
 
 migrate-up:
 	goose -dir ${MIGRATION_DIR} postgres "${DB_DSN}" up
@@ -36,7 +37,6 @@ test:
 test-race:
 	go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-# exemple : make test-k6 BASE_URL=http://localhost:8080/api/v1/wod/generate TOKEN="$(go run cmd/gen-jwt/main.go user123)"
 test-k6:
 	@for f in tests/*.js; do \
 		echo "=== Running $$f ==="; \
@@ -46,6 +46,7 @@ test-k6:
 fmt:
 	gofumpt -w .
 	go fmt ./...
+	gci write --skip-generated -s standard -s default .
 
 vet:
 	go vet ./...
@@ -73,43 +74,6 @@ docker-up:
 
 docker-down:
 	docker compose down
-
-docker-push:
-	@echo "Pushing Docker image to registry..."
-	docker push $(DOCKER_REGISTRY)/$(APP_NAME):$(TAG)
-	@echo "✅ Docker image pushed successfully!"
-
-docker-run-postgres:
-	@echo "Starting PostgreSQL container..."
-	docker run --name user-service-postgres \
-		-p 5432:5432 \
-		-e POSTGRES_USER=postgres \
-		-e POSTGRES_PASSWORD=Saadsaad1 \
-		-e POSTGRES_DB=gomicro \
-		-d postgres:15-alpine
-	@echo "✅ PostgreSQL container started!"
-
-docker-run-app:
-	@echo "Running the application in a Docker container..."
-	docker run --name $(APP_NAME) \
-		-p 8080:8080 \
-		--network host \
-		-e DB_DSN="postgres://postgres:Saadsaad1@localhost:5432/gomicro?sslmode=disable" \
-		-d $(DOCKER_REGISTRY)/$(APP_NAME):$(TAG)
-	@echo "✅ Application container started!"
-
-docker-run: docker-run-postgres docker-run-app
-
-# Docker Compose targets
-docker-compose-dev:
-	@echo "Starting services with docker-compose (dev)..."
-	docker-compose -f docker-compose.dev.yml up -d
-	@echo "✅ Dev environment started!"
-
-docker-compose-prod:
-	@echo "Starting services with docker-compose (prod)..."
-	docker-compose -f docker-compose.prod.yml up -d
-	@echo "✅ Production environment started!"
 
 # Clean up
 clean:

@@ -18,6 +18,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/runtime"
 	strictgin "github.com/oapi-codegen/runtime/strictmiddleware/gin"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
@@ -78,6 +79,12 @@ type WodLevel string
 // GenerateWodRequest defines model for GenerateWodRequest.
 type GenerateWodRequest = GenerateWodParams
 
+// ListWodsParams defines parameters for ListWods.
+type ListWodsParams struct {
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // GenerateWodJSONRequestBody defines body for GenerateWod for application/json ContentType.
 type GenerateWodJSONRequestBody = GenerateWodParams
 
@@ -86,6 +93,9 @@ type ServerInterface interface {
 
 	// (POST /wod/generate)
 	GenerateWod(c *gin.Context)
+	// List stored WODs
+	// (GET /wod/list)
+	ListWods(c *gin.Context, params ListWodsParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -108,6 +118,40 @@ func (siw *ServerInterfaceWrapper) GenerateWod(c *gin.Context) {
 	}
 
 	siw.Handler.GenerateWod(c)
+}
+
+// ListWods operation middleware
+func (siw *ServerInterfaceWrapper) ListWods(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWodsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", c.Request.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", c.Request.URL.Query(), &params.Offset)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter offset: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListWods(c, params)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -138,6 +182,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	}
 
 	router.POST(options.BaseURL+"/wod/generate", wrapper.GenerateWod)
+	router.GET(options.BaseURL+"/wod/list", wrapper.ListWods)
 }
 
 type GenerateWodRequestObject struct {
@@ -202,11 +247,42 @@ func (response GenerateWod500JSONResponse) VisitGenerateWodResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListWodsRequestObject struct {
+	Params ListWodsParams
+}
+
+type ListWodsResponseObject interface {
+	VisitListWodsResponse(w http.ResponseWriter) error
+}
+
+type ListWods200JSONResponse struct {
+	Wods *[]Wod `json:"wods,omitempty"`
+}
+
+func (response ListWods200JSONResponse) VisitListWodsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListWods500JSONResponse ErrorResponse
+
+func (response ListWods500JSONResponse) VisitListWodsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
 	// (POST /wod/generate)
 	GenerateWod(ctx context.Context, request GenerateWodRequestObject) (GenerateWodResponseObject, error)
+	// List stored WODs
+	// (GET /wod/list)
+	ListWods(ctx context.Context, request ListWodsRequestObject) (ListWodsResponseObject, error)
 }
 
 type StrictHandlerFunc = strictgin.StrictGinHandlerFunc
@@ -254,25 +330,54 @@ func (sh *strictHandler) GenerateWod(ctx *gin.Context) {
 	}
 }
 
+// ListWods operation middleware
+func (sh *strictHandler) ListWods(ctx *gin.Context, params ListWodsParams) {
+	var request ListWodsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListWods(ctx, request.(ListWodsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListWods")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(ListWodsResponseObject); ok {
+		if err := validResponse.VisitListWodsResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"H4sIAAAAAAAC/8RXb2/bthP+KsT9fi82jLIlpy5QAXnRYlsWYMCCYEOABUFAiyeHqUiqJOU/C/Tdh6Nk",
+	"x7KVruiK7JUlUnzuubvneOcnKKyurUETPORP4PBTgz58sFJhXLhAg04EvLHyutuj1cKagCY+irquVCGC",
+	"smb66K2hNV88oBb09H+HJeTwv+mzmWm366cH0FfCCe2hbVseKSiHEvLgGqSV/gDhfahs8ZEeJPrCqZrM",
+	"Qg7v2dq6j7YJbEEfsO+0XaFGE9gPrI7Y3wOH2tkaXeg9M0Ij/eJG6LpCyOHaroFD2Nb04oNTZgkthw4g",
+	"+iqlIouiujqAIpr8GeYJNAZ0HvIsTdN2D2gXj1gEaE9XOPzknHXX6GtrfIQYUi2sHFJ9k6Z7FGUCLtER",
+	"jEbvxfLIK2VWolKS9akd87DfuldyeHSRlW/FTJ4lk8kEOJimqsSCdjqXj3AGubvtSD9zuhtx+1QBLwa5",
+	"FJXH4xTKxkXh3WtlhvGZc9Bio3SjIc9mKQetTP82P4kch01iRa0SorxEk+AmOJEEsYxWYvhEoBM7/7hW",
+	"5jybcy0259ksjb7TVq37qtgzuQVn19GGr1ACh0XjakS2cFZI9tjomiKjAnbOn6SmXxDOiS29V7jCKlow",
+	"5M0tLHCpjIkWyB+nUSoiy0HIlTAFSjJwKIfBR0ODXxEJa9CW5zsW7BCe7RnEKkY8kpdEbRNaTrLZGfyT",
+	"njrP+TDpY6q6sfK0hOK9EJ/2sf7c3dTdMyPxLxyKgPJeDNMMs3Q2T9J3Sfr292yWp2mepn8Ch9I6TZ8C",
+	"hS0JSuNY/R3r+LSyB+L6crUsuwKz7n6Fzis7rBJYZWNsultgz7xplBz77CuVeIKz08Xnsx85HASfj+uB",
+	"7xLd446F4FQzZEyZ0o40lqtLFizrQZAJQxdpcApXyH7ZOrtJfNhWuOs/ZDioEKMbt9nNbz+yix0H9v7q",
+	"EjjskwHpJJukFAVboxG1ghzOJukkpW4lwkPM8nRt5XTHICrbdl14SPViz5EZXEe7C+FRMmtYYY0PTigT",
+	"CVJdxJBdyoNzVDb8YADYvlQjgxlhOjIgxNR1vSw6MEvTbzY0EMuYr6Hz5O0uRJL5pijQ+7KpqlgGb74h",
+	"gWGrHqFyOey3bEGhjCSy1yPxhxFNeLBO/UW3Lxk/ez3jP1u3UFKiiZZn717P8jXpv1JaBYabAlF23s9f",
+	"N/8BnREV8+hW6BjSAfqw5V0pV6or3yXGn2E1/qp8uLHSQz939qPk7RNQa4BPDbotjWJxeIXoKvAD6hJL",
+	"0VSBhs/Doed0Wmz5OKQtS48vYB5Cjgyg7d2/LPxhy15TGL60Ycd74bgBtqM3/fFfB8oHsyXdmP6/U8tO",
+	"Jhx8o7Vw214MzAfrUPbsukGKdNWJonEV5DAVtZquMmjv2r8DAAD//6EO8xbRDQAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -1,4 +1,20 @@
 services:
+  pgsql:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: wodgen
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - ${PWD}/db/migrations/001_init.up.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: .
@@ -8,9 +24,12 @@ services:
       - "8080:8080"
     environment:
       PORT: "8080"
-      API_KEYS: "devkey"
       RATE_LIMITER_BURST: "15"
       RATE_LIMITER_REQUESTS_PER_SECOND: "30"
       RATE_LIMITER_STRATEGY: "token"
       RATE_LIMITER_ENABLED: "true"
+      AUTH_JWT_SECRET: "10c473fa9972a3934bb87d42438a61124fa3836e102498953cdc198e073e63b2"
       ENV: "dev"
+    depends_on:
+      pgsql:
+        condition: service_healthy

@@ -4,20 +4,17 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/LinaKACI-pro/wod-gen/internal/models"
+	"github.com/LinaKACI-pro/wod-gen/internal/core"
 	"github.com/bytedance/gopkg/util/logger"
 )
 
-type Generator interface {
-	Generate(ctx context.Context, level string, durationMin int, equipment []string, seed *string) (models.Wod, error)
-}
-
 type Server struct {
-	gen Generator
+	wodGenerate core.WodGeneratorInterface
+	wodList     core.WodListInterface
 }
 
-func NewServer(gen Generator) *Server {
-	return &Server{gen: gen}
+func NewServer(wodGenerate core.WodGeneratorInterface, list core.WodListInterface) *Server {
+	return &Server{wodGenerate: wodGenerate, wodList: list}
 }
 
 func (server *Server) GenerateWod(ctx context.Context, req GenerateWodRequestObject) (GenerateWodResponseObject, error) {
@@ -35,9 +32,9 @@ func (server *Server) GenerateWod(ctx context.Context, req GenerateWodRequestObj
 		equipment = nil
 	}
 
-	wod, err := server.gen.Generate(ctx, string(req.Body.Level), req.Body.DurationMin, equipment, req.Body.Seed)
+	wod, err := server.wodGenerate.Generate(ctx, string(req.Body.Level), req.Body.DurationMin, equipment, req.Body.Seed)
 	if err != nil {
-		logger.Error("server.gen.Generate failed", "err", err)
+		logger.Error("server.wodGenerate.Generate()", "err", err)
 
 		return &GenerateWod400JSONResponse{
 			Code:    http.StatusBadRequest,
@@ -60,4 +57,44 @@ func (server *Server) GenerateWod(ctx context.Context, req GenerateWodRequestObj
 		Level:            WodLevel(wod.Level),
 		Seed:             wod.Seed,
 	}, nil
+}
+
+func (server *Server) ListWods(ctx context.Context, req ListWodsRequestObject) (ListWodsResponseObject, error) {
+	limit := 10
+	offset := 0
+	if req.Params.Limit != nil {
+		limit = *req.Params.Limit
+	}
+	if req.Params.Offset != nil {
+		offset = *req.Params.Offset
+	}
+
+	wods, err := server.wodList.List(ctx, limit, offset)
+	if err != nil {
+		logger.Error("server.wodList.List()", "err", err)
+		return &ListWods500JSONResponse{
+			Code:    http.StatusInternalServerError,
+			Message: "failed to list wods",
+		}, nil
+	}
+
+	resp := make([]Wod, len(wods))
+	for i, w := range wods {
+		blocks := make([]Block, len(w.Blocks))
+		for j, b := range w.Blocks {
+			blocks[j] = Block{Name: &b.Name, Params: &b.Params}
+		}
+		resp[i] = Wod{
+			Id:               w.ID,
+			Seed:             w.Seed,
+			CreatedAt:        w.CreatedAt,
+			Level:            WodLevel(w.Level),
+			DurationMin:      w.DurationMin,
+			Equipment:        &w.Equipment,
+			Blocks:           blocks,
+			GeneratorVersion: "v1",
+		}
+	}
+
+	return &ListWods200JSONResponse{Wods: &resp}, nil
 }

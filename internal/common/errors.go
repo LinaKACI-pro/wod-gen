@@ -10,6 +10,7 @@ var (
 	ErrDuration     = errors.New("duration_min must be between 15 and 120")
 	ErrEmptyCatalog = errors.New("empty catalog")
 	ErrNoMoves      = errors.New("no moves available")
+	ErrNoWodsFound  = errors.New("no wods found")
 )
 
 type InvalidDataError struct {

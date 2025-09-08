@@ -29,7 +29,11 @@ type HTTPConfig struct {
 }
 
 type DBConfig struct {
-	URL string `env:"DATABASE_URL"`
+	NAME     string `env:"DATABASE_NAME" envDefault:"wodgen"`
+	USER     string `env:"DATABASE_USER" envDefault:"postgres"`
+	PASSWORD string `env:"DATABASE_PASSWORD" envDefault:"postgres"`
+	HOST     string `env:"DATABASE_HOST" envDefault:"pgsql"`
+	PORT     string `env:"DATABASE_PORT" envDefault:"5432"`
 }
 
 type ObsConfig struct {

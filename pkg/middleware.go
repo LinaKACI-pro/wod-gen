@@ -112,7 +112,7 @@ func AuthJWT(m *JWTManager, logger *slog.Logger) gin.HandlerFunc {
 
 		claims, err := m.Verify(tokenStr)
 		if err != nil {
-			logger.Warn("invalid jwt", slog.String("err", err.Error()))
+			logger.Warn("m.Verify()", slog.String("err", err.Error()))
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}

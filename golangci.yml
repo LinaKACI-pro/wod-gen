@@ -106,4 +106,4 @@ issues:
       linters: [ errcheck, staticcheck, govet, revive ]
       text: ".*"
     - path: _test\.go$
-      linters: [err113, dogsled]
+      linters: [err113, dogsled, revive, errcheck]

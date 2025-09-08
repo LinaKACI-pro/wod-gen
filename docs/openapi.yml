@@ -50,6 +50,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /wod/list:
+    get:
+      summary: List stored WODs
+      operationId: listWods
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: A list of WODs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wods:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Wod'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   requestBodies:

@@ -38,6 +38,7 @@ func (m *JWTManager) Verify(tokenStr string) (*jwt.RegisteredClaims, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrUnexpectedSigningMethod
 		}
+
 		return m.secretKey, nil
 	})
 	if err != nil {
@@ -48,5 +49,6 @@ func (m *JWTManager) Verify(tokenStr string) (*jwt.RegisteredClaims, error) {
 	if !ok || !token.Valid {
 		return nil, jwt.ErrTokenInvalidClaims
 	}
+
 	return claims, nil
 }

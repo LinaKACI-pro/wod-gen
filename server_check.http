@@ -1,8 +1,7 @@
 @local = http://localhost:8080/
 @prod = https://wod-gen.fly.dev/
 @base = {{local}}
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzU3NDE3NjY0LCJpYXQiOjE3NTczMzEyNjR9.aLv1dwzSersSN63HJwsDErYVjDq9NnKJ_DyVsaebjAg
-
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzU3NDM3NDY4LCJpYXQiOjE3NTczNTEwNjh9.FsE9SDr-StQIGN0b3aOO-89VF8-cI-ohydROaqsd6zM
 ###
 # Health
 GET {{base}}/healthz
@@ -11,14 +10,11 @@ GET {{base}}/healthz
 # Ready
 GET {{base}}/readyz
 
-
 ################################
-#      API v1 — protected      #
+#      API v1 protected      #
 ################################
 
-###
-# 200 — Happy path (deterministic via seed)
-# Relance exactement cette requête: les "blocks" doivent être identiques.
+### 200 Happy path (deterministic via seed)
 POST {{base}}/api/v1/wod/generate
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -30,8 +26,7 @@ Content-Type: application/json
   "seed": "abcd-1234"
 }
 
-###
-# 200 — Happy path (autre seed pour voir un autre WOD)
+### 200 Happy path (autre seed pour voir un autre WOD)
 POST {{base}}/api/v1/wod/generate
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -43,8 +38,7 @@ Content-Type: application/json
 }
 
 
-###
-# 400 — invalid enum (level)
+### 400 invalid enum (level)
 POST {{base}}/api/v1/wod/generate
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -54,8 +48,7 @@ Content-Type: application/json
   "duration_min": 35
 }
 
-###
-# 400 — duration too small (min=15)
+### 400 duration too small (min=15)
 POST {{base}}/api/v1/wod/generate
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -66,8 +59,7 @@ Content-Type: application/json
 }
 
 
-###
-# 401 — missing auth (envoie un body valide sans Authorization)
+### 401 missing auth (envoie un body valide sans Authorization)
 POST {{base}}/api/v1/wod/generate
 Content-Type: application/json
 
@@ -75,3 +67,15 @@ Content-Type: application/json
   "level": "intermediate",
   "duration_min": 30
 }
+
+### List WODs (default pagination)
+GET {{base}}/api/v1/wod/list
+Authorization: Bearer {{token}}
+
+### List WODs (limit=2)
+GET {{base}}/api/v1/wod/list?limit=1&offset=0
+Authorization: Bearer {{token}}
+
+### List WODs (offset pagination)
+GET {{base}}/api/v1/wod/list?limit=2&offset=2
+Authorization: Bearer {{token}}

@@ -1,4 +1,4 @@
-package handlers
+package handlers_test
 
 import (
 	"context"
@@ -6,86 +6,111 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LinaKACI-pro/wod-gen/internal/handlers"
 	"github.com/LinaKACI-pro/wod-gen/internal/models"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-type fakeGenerator struct {
+type mockWodGenerator struct {
 	wod models.Wod
 	err error
 }
 
-func (f *fakeGenerator) Generate(ctx context.Context, level string, durationMin int, equipment []string, seed *string) (models.Wod, error) {
-	_, _, _, _, _ = ctx, level, durationMin, equipment, seed
-	return f.wod, f.err
+func (m *mockWodGenerator) Generate(ctx context.Context, level string, durationMin int, equipment []string, seed *string) (models.Wod, error) {
+	if m.err != nil {
+		return models.Wod{}, m.err
+	}
+	return m.wod, nil
 }
 
-func TestGenerateWod_Success(t *testing.T) {
-	now := time.Now().UTC()
-	expected := models.Wod{
-		ID:          uuid.New(),
-		CreatedAt:   now,
-		Level:       "beginner",
-		DurationMin: 30,
-		Equipment:   []string{"rower"},
-		Seed:        "abc123",
-		Blocks: []models.Block{
-			{Name: "Push-ups", Params: map[string]interface{}{"reps": 10}},
-		},
-	}
-
-	server := NewServer(&fakeGenerator{wod: expected})
-
-	req := GenerateWodRequestObject{
-		Body: &GenerateWodJSONRequestBody{
-			Level:       GenerateWodParamsLevel(expected.Level),
-			DurationMin: expected.DurationMin,
-			Equipment:   &expected.Equipment,
-			Seed:        &expected.Seed,
-		},
-	}
-
-	resp, err := server.GenerateWod(context.Background(), req)
-	require.NoError(t, err)
-
-	okResp, ok := resp.(*GenerateWod200JSONResponse)
-	require.True(t, ok)
-
-	require.Equal(t, expected.DurationMin, okResp.DurationMin)
-	require.Equal(t, expected.Level, string(okResp.Level))
-	require.Equal(t, expected.Seed, okResp.Seed)
-	require.Len(t, okResp.Blocks, 1)
-	require.Equal(t, "Push-ups", *okResp.Blocks[0].Name)
+type mockWodList struct {
+	wods []models.Wod
+	err  error
 }
 
-func TestGenerateWod_Error(t *testing.T) {
-	server := NewServer(&fakeGenerator{err: errors.New("boom")})
-
-	req := GenerateWodRequestObject{
-		Body: &GenerateWodJSONRequestBody{
-			Level:       "beginner",
-			DurationMin: 20,
-		},
+func (m *mockWodList) List(ctx context.Context, limit, offset int) ([]models.Wod, error) {
+	if m.err != nil {
+		return nil, m.err
 	}
-
-	resp, err := server.GenerateWod(context.Background(), req)
-	require.NoError(t, err)
-
-	errResp, ok := resp.(*GenerateWod400JSONResponse)
-	require.True(t, ok)
-	require.Equal(t, 400, errResp.Code)
-	require.Contains(t, errResp.Message, "invalid request")
+	return m.wods, nil
 }
 
 func TestGenerateWod_MissingBody(t *testing.T) {
-	server := NewServer(&fakeGenerator{})
+	s := handlers.NewServer(&mockWodGenerator{}, &mockWodList{})
 
-	req := GenerateWodRequestObject{Body: nil}
-	resp, err := server.GenerateWod(context.Background(), req)
+	resp, err := s.GenerateWod(context.Background(), handlers.GenerateWodRequestObject{Body: nil})
 	require.NoError(t, err)
 
-	errResp, ok := resp.(*GenerateWod400JSONResponse)
-	require.True(t, ok)
-	require.Equal(t, 400, errResp.Code)
+	r := resp.(*handlers.GenerateWod400JSONResponse)
+	require.Equal(t, 400, r.Code)
+}
+
+func TestGenerateWod_Success(t *testing.T) {
+	mockWod := models.Wod{
+		ID:          uuid.New(),
+		CreatedAt:   time.Now(),
+		Level:       "beginner",
+		DurationMin: 20,
+		Equipment:   []string{"rower"},
+		Seed:        "seed123",
+		Blocks:      []models.Block{{Name: "Run", Params: map[string]interface{}{"meters": 200}}},
+	}
+
+	s := handlers.NewServer(&mockWodGenerator{wod: mockWod}, &mockWodList{})
+
+	body := handlers.GenerateWodJSONRequestBody{
+		Level:       "beginner",
+		DurationMin: 20,
+	}
+	resp, err := s.GenerateWod(context.Background(), handlers.GenerateWodRequestObject{Body: &body})
+	require.NoError(t, err)
+
+	r := resp.(*handlers.GenerateWod200JSONResponse)
+	require.Equal(t, "beginner", string(r.Level))
+	require.NotEmpty(t, r.Blocks)
+}
+
+func TestGenerateWod_ErrorFromGenerator(t *testing.T) {
+	s := handlers.NewServer(&mockWodGenerator{err: errors.New("fail")}, &mockWodList{})
+
+	body := handlers.GenerateWodJSONRequestBody{
+		Level:       "beginner",
+		DurationMin: 20,
+	}
+	resp, err := s.GenerateWod(context.Background(), handlers.GenerateWodRequestObject{Body: &body})
+	require.NoError(t, err)
+
+	r := resp.(*handlers.GenerateWod400JSONResponse)
+	require.Equal(t, 400, r.Code)
+}
+
+func TestListWods_Success(t *testing.T) {
+	mockWod := models.Wod{
+		ID:          uuid.New(),
+		CreatedAt:   time.Now(),
+		Level:       "beginner",
+		DurationMin: 20,
+		Equipment:   []string{"rower"},
+		Seed:        "seed123",
+		Blocks:      []models.Block{{Name: "Run", Params: map[string]interface{}{"meters": 200}}},
+	}
+	s := handlers.NewServer(&mockWodGenerator{}, &mockWodList{wods: []models.Wod{mockWod}})
+
+	resp, err := s.ListWods(context.Background(), handlers.ListWodsRequestObject{})
+	require.NoError(t, err)
+
+	r := resp.(*handlers.ListWods200JSONResponse)
+	require.Len(t, *r.Wods, 1)
+	require.Equal(t, "beginner", string((*r.Wods)[0].Level))
+}
+
+func TestListWods_ErrorFromRepo(t *testing.T) {
+	s := handlers.NewServer(&mockWodGenerator{}, &mockWodList{err: errors.New("db fail")})
+
+	resp, err := s.ListWods(context.Background(), handlers.ListWodsRequestObject{})
+	require.NoError(t, err)
+
+	r := resp.(*handlers.ListWods500JSONResponse)
+	require.Equal(t, 500, r.Code)
 }

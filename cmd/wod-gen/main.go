@@ -3,7 +3,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -17,10 +19,12 @@ import (
 	"github.com/LinaKACI-pro/wod-gen/internal/core"
 	"github.com/LinaKACI-pro/wod-gen/internal/core/catalog"
 	"github.com/LinaKACI-pro/wod-gen/internal/handlers"
+	"github.com/LinaKACI-pro/wod-gen/internal/repository"
 	"github.com/LinaKACI-pro/wod-gen/pkg"
 	"github.com/caarlos0/env/v11"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	_ "github.com/lib/pq"
 	ginvalidator "github.com/oapi-codegen/gin-middleware"
 )
 
@@ -48,10 +52,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	database, err := initDB(cfg.DB)
+	if err != nil {
+		logger.Error("initDb: ", "err", err)
+		return
+	}
+	defer database.Close()
+
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 
-	err := r.SetTrustedProxies(nil)
+	err = r.SetTrustedProxies(nil)
 	if err != nil {
 		log.Printf("r.SetTrustedProxies: %v\n", err)
 	}
@@ -90,13 +101,21 @@ func main() {
 	swagger.Servers = nil
 	r.Use(ginvalidator.OapiRequestValidator(swagger))
 
-	c, err := core.NewCatalog(catalog.Raw)
+	// load catalog of wod.
+	c, err := catalog.NewCatalog(catalog.Raw)
 	if err != nil {
 		logger.Error("catalog.NewCatalog: ", "err", err)
 		return
 	}
 
-	server := handlers.NewServer(c)
+	// init repository
+	wodRepo := repository.NewWodRepository(database)
+
+	// init core
+	wodGenerateCore := core.NewWodGenerator(c, wodRepo)
+	wodListCore := core.NewWodList(c, wodRepo)
+
+	server := handlers.NewServer(wodGenerateCore, wodListCore)
 	handlers.RegisterHandlersWithOptions(api, handlers.NewStrictHandler(server, nil), handlers.GinServerOptions{
 		BaseURL: "",
 	})
@@ -134,4 +153,21 @@ func main() {
 	} else {
 		logger.Info("server stopped")
 	}
+}
+
+func initDB(dbCfg config.DBConfig) (*sql.DB, error) {
+	// Construct the data source name (DSN)
+	dataSourceName := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		dbCfg.USER, dbCfg.PASSWORD, dbCfg.HOST, dbCfg.PORT, dbCfg.NAME)
+
+	db, err := sql.Open("postgres", dataSourceName)
+	if err != nil {
+		return nil, fmt.Errorf("sql.Open(dbName, url): %w", err)
+	}
+	// test connection
+	if err = db.Ping(); err != nil {
+		return nil, fmt.Errorf("db.Ping: %w", err)
+	}
+
+	return db, nil
 }

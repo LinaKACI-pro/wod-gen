@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/LinaKACI-pro/wod-gen/internal/common"
+	"github.com/LinaKACI-pro/wod-gen/internal/core/catalog"
 	"github.com/LinaKACI-pro/wod-gen/internal/models"
+	"github.com/LinaKACI-pro/wod-gen/internal/repository"
 	"github.com/google/uuid"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -21,20 +22,6 @@ const (
 	MaxDuration         = 120
 )
 
-type rng [2]int
-
-type move struct {
-	Name       string                    `yaml:"name"`
-	NeedsOneOf []string                  `yaml:"needs_one_of"`
-	Tags       []string                  `yaml:"tags"`
-	Weight     float64                   `yaml:"weight"`
-	Ranges     map[string]map[string]rng `yaml:"ranges"` // level -> param -> [min,max]
-}
-
-type Catalog struct {
-	Moves []move `yaml:"moves"`
-}
-
 type Params struct {
 	Level       string
 	DurationMin int
@@ -42,33 +29,50 @@ type Params struct {
 	Seed        string
 }
 
-func NewCatalog(raw []byte) (*Catalog, error) {
-	var c Catalog
-	if err := yaml.Unmarshal(raw, &c); err != nil {
-		return nil, fmt.Errorf("parse catalog: %w", err)
-	}
-	for i := range c.Moves {
-		if c.Moves[i].Weight == 0 {
-			c.Moves[i].Weight = 1.0
-		}
-	}
-
-	return &Catalog{Moves: c.Moves}, nil
+type WodGeneratorInterface interface {
+	Generate(ctx context.Context, level string, durationMin int, equipment []string, seed *string) (models.Wod, error)
 }
 
-func (c *Catalog) Generate(ctx context.Context, level string, durationMin int, equipment []string, seed *string) (models.Wod, error) {
-	_ = ctx
+type WodGenerator struct {
+	wodRepository repository.WodRepositoryInterface
+	catalog       *catalog.Catalog
+}
+
+func NewWodGenerator(catalog *catalog.Catalog, wodRepository repository.WodRepositoryInterface) *WodGenerator {
+	return &WodGenerator{catalog: catalog, wodRepository: wodRepository}
+}
+
+func (w *WodGenerator) Generate(ctx context.Context, level string, durationMin int, equipment []string, seed *string) (models.Wod, error) {
+	lv, parsedSeed, err := validateInfo(level, durationMin, seed, w.catalog.Moves)
+	if err != nil {
+		return models.Wod{}, fmt.Errorf("validateInfo(): %w", err)
+	}
+
+	wod, err := buildWod(lv, durationMin, equipment, parsedSeed, w.catalog.Moves)
+	if err != nil {
+		return models.Wod{}, fmt.Errorf("buildWod(): %w", err)
+	}
+
+	savedWod, err := w.wodRepository.SaveWod(ctx, wod)
+	if err != nil {
+		return models.Wod{}, fmt.Errorf("wodRepository.SaveWod(): %w", err)
+	}
+
+	return savedWod, nil
+}
+
+func validateInfo(level string, durationMin int, seed *string, moves []catalog.Move) (string, string, error) {
 	lv := strings.ToLower(level)
 	if lv != Beginner && lv != Intermediate && lv != Advanced {
-		return models.Wod{}, common.InvalidDataError{DataType: "level", Data: lv}
+		return "", "", common.InvalidDataError{DataType: "level", Data: lv}
 	}
 
 	if durationMin < MinDuration || durationMin > MaxDuration {
-		return models.Wod{}, common.ErrDuration
+		return "", "", common.ErrDuration
 	}
 
-	if len(c.Moves) == 0 {
-		return models.Wod{}, common.ErrEmptyCatalog
+	if len(moves) == 0 {
+		return "", "", common.ErrEmptyCatalog
 	}
 
 	var parsedSeed string
@@ -77,32 +81,37 @@ func (c *Catalog) Generate(ctx context.Context, level string, durationMin int, e
 	} else {
 		parsedSeed = uuid.NewString()
 	}
-	hs := seedHash(parsedSeed, durationMin, lv, equipment)
-	rnd := rand.New(rand.NewSource(hs)) //nolint:gosec // G404: deterministic, non-crypto PRNG is intended for workout sampling
 
-	avail := filterByEquipment(c.Moves, equipment)
+	return lv, parsedSeed, nil
+}
+
+func buildWod(level string, durationMin int, equipment []string, parsedSeed string, moves []catalog.Move) (models.Wod, error) {
+	hs := seedHash(parsedSeed, durationMin, level, equipment)
+	rnd := rand.New(rand.NewSource(hs)) //nolint:gosec // deterministic
+
+	avail := filterByEquipment(moves, equipment)
 	if len(avail) == 0 {
-		avail = filterNoEquipment(c.Moves)
+		avail = filterNoEquipment(moves)
 		if len(avail) == 0 {
 			return models.Wod{}, common.ErrNoMoves
 		}
 	}
 
-	n := blocksForDuration(lv, durationMin)
+	n := blocksForDuration(level, durationMin)
 
 	blocks := make([]models.Block, 0, n)
 	var last string
 	for i := 0; i < n; i++ {
 		m := weightedPick(rnd, avail, last)
 		last = m.Name
-		params := pickParams(rnd, m.Ranges[lv])
+		params := pickParams(rnd, m.Ranges[level])
 		blocks = append(blocks, models.Block{Name: m.Name, Params: params})
 	}
 
 	return models.Wod{
 		ID:          uuid.New(),
 		CreatedAt:   time.Now().UTC(),
-		Level:       lv,
+		Level:       level,
 		DurationMin: durationMin,
 		Equipment:   cloneStrings(equipment),
 		Seed:        parsedSeed,

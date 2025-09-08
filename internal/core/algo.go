@@ -8,11 +8,13 @@ import (
 	"math"
 	"math/rand"
 	"strings"
+
+	"github.com/LinaKACI-pro/wod-gen/internal/core/catalog"
 )
 
 const (
 	defaultReps     = 10
-	repeatPenalty   = 0.1 // reduce weight if same move as last
+	repeatPenalty   = 0.1 // reduce weight if same catalog.Move as last
 	minParamDefault = 1
 )
 
@@ -42,7 +44,7 @@ func blocksForDuration(level string, d int) int {
 	}
 }
 
-func filterByEquipment(list []move, eqs []string) []move {
+func filterByEquipment(list []catalog.Move, eqs []string) []catalog.Move {
 	set := map[string]struct{}{}
 	for _, s := range eqs {
 		s = strings.ToLower(strings.TrimSpace(s))
@@ -50,7 +52,7 @@ func filterByEquipment(list []move, eqs []string) []move {
 			set[s] = struct{}{}
 		}
 	}
-	out := make([]move, 0, len(list))
+	out := make([]catalog.Move, 0, len(list))
 	for _, m := range list {
 		if len(m.NeedsOneOf) == 0 {
 			out = append(out, m)
@@ -66,8 +68,8 @@ func filterByEquipment(list []move, eqs []string) []move {
 	return out
 }
 
-func filterNoEquipment(list []move) []move {
-	out := make([]move, 0, len(list))
+func filterNoEquipment(list []catalog.Move) []catalog.Move {
+	out := make([]catalog.Move, 0, len(list))
 	for _, m := range list {
 		if len(m.NeedsOneOf) == 0 {
 			out = append(out, m)
@@ -76,7 +78,7 @@ func filterNoEquipment(list []move) []move {
 	return out
 }
 
-func weightedPick(rnd *rand.Rand, avail []move, last string) move {
+func weightedPick(rnd *rand.Rand, avail []catalog.Move, last string) catalog.Move {
 	total := 0.0
 	acc := make([]float64, len(avail))
 	for i, m := range avail {
@@ -97,7 +99,7 @@ func weightedPick(rnd *rand.Rand, avail []move, last string) move {
 	return avail[len(avail)-1]
 }
 
-func pickParams(rnd *rand.Rand, ranges map[string]rng) map[string]interface{} {
+func pickParams(rnd *rand.Rand, ranges map[string]catalog.Rng) map[string]interface{} {
 	out := make(map[string]interface{}, len(ranges))
 	if len(ranges) == 0 {
 		out["reps"] = defaultReps
