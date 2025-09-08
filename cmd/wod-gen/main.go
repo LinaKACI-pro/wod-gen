@@ -161,8 +161,8 @@ func main() {
 
 func initDB(dbCfg config.DBConfig) (*sql.DB, error) {
 	// Construct the data source name (DSN)
-	dataSourceName := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		dbCfg.USER, dbCfg.PASSWORD, dbCfg.HOST, dbCfg.PORT, dbCfg.NAME)
+	dataSourceName := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+		dbCfg.USER, dbCfg.PASSWORD, dbCfg.HOST, dbCfg.PORT, dbCfg.NAME, dbCfg.SSLMODE)
 
 	db, err := sql.Open("postgres", dataSourceName)
 	if err != nil {

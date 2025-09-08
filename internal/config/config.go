@@ -34,6 +34,7 @@ type DBConfig struct {
 	PASSWORD string `env:"DATABASE_PASSWORD" envDefault:"postgres"`
 	HOST     string `env:"DATABASE_HOST" envDefault:"pgsql"`
 	PORT     string `env:"DATABASE_PORT" envDefault:"5432"`
+	SSLMODE  string `env:"DATABASE_SSLMODE" envDefault:"disable"`
 }
 
 type ObsConfig struct {
