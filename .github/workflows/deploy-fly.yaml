@@ -1,0 +1,55 @@
+name: Deploy (Fly.io)
+
+on:
+  workflow_run:
+    workflows: ["Container Build & Push"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  IMAGE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  IMAGE_NAME: linakaci-pro/wod-gen
+
+jobs:
+  deploy:
+    environment: prod
+    if: >
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'
+      }}
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IMAGE_SHA }}
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@v1
+
+      - name: Ensure app exists
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl apps create "${{ secrets.FLY_APP }}" || true
+
+      - name: Deploy image from GHCR
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl deploy \
+            --app "${{ secrets.FLY_APP }}" \
+            --image "ghcr.io/${{ env.IMAGE_NAME }}:${IMAGE_SHA}" \
+            --strategy immediate \
+            --detach
+
+      - name: Show app status
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl status --app "${{ secrets.FLY_APP }}"

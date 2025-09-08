@@ -124,12 +124,15 @@ func pickParams(rnd *rand.Rand, ranges map[string]rng) map[string]interface{} {
 
 func seedHash(seed string, dur int, level string, equip []string) int64 {
 	h := sha256.New()
-	fmt.Fprintf(h, "%s|%s|%d|%s",
+	_, err := fmt.Fprintf(h, "%s|%s|%d|%s",
 		seed,
 		level,
 		dur,
 		strings.Join(equip, ","),
 	)
+	if err != nil {
+		return 0
+	}
 	sum := h.Sum(nil)
 	u := binary.LittleEndian.Uint64(sum[:8]) & math.MaxInt64
 	return int64(u)

@@ -2,6 +2,10 @@ name: CI
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -23,11 +27,9 @@ jobs:
           cache: true
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
-          install-mode: binary
-          skip-cache: true
           args: --timeout=5m
         continue-on-error: false
 
