@@ -21,6 +21,7 @@ import (
 	"github.com/LinaKACI-pro/wod-gen/internal/handlers"
 	"github.com/LinaKACI-pro/wod-gen/internal/repository"
 	"github.com/LinaKACI-pro/wod-gen/pkg"
+	"github.com/LinaKACI-pro/wod-gen/pkg/obs"
 	"github.com/caarlos0/env/v11"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -29,7 +30,7 @@ import (
 )
 
 func main() {
-	// ---- Config ----
+	// Init config
 	var cfg config.Config
 	if err := env.Parse(&cfg); err != nil {
 		log.Fatalf("env.Parse: %v", err)
@@ -40,7 +41,7 @@ func main() {
 		log.Fatalf("invalid config: %v", err)
 	}
 
-	// ---- Logger ----
+	// init logger
 	logger := pkg.NewLogger()
 
 	logger.Info("boot",
@@ -52,37 +53,31 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// init Observability
+	otelSetup, err := obs.Init(ctx, cfg.Obs.OTLPEndpoint, cfg.Obs.GrafanaToken)
+	if err != nil {
+		logger.Warn("obs.Init()", slog.Any("err", err))
+		otelSetup = &obs.Setup{Stop: func(context.Context) error { return nil }}
+	}
+	defer func() {
+		if err = otelSetup.Stop(context.Background()); err != nil {
+			logger.Error("otelSetup.Stop", slog.Any("err", err))
+		}
+	}()
+
+	// init db
 	database, err := initDB(cfg.DB)
 	if err != nil {
-		logger.Error("initDb: ", "err", err)
+		logger.Error("initDb: ", slog.Any("err", err))
 		return
 	}
 	defer func() {
 		if err = database.Close(); err != nil {
-			logger.Warn("failed to close rows: ", "err", err)
+			logger.Warn("failed to close rows: ", slog.Any("err", err))
 		}
 	}()
 
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.New()
-
-	err = r.SetTrustedProxies(nil)
-	if err != nil {
-		log.Printf("r.SetTrustedProxies: %v\n", err)
-	}
-
-	r.Use(pkg.RecoveryMiddleware(logger))
-	r.Use(pkg.RequestID())
-	r.Use(pkg.Logging(logger))
-
-	isProd := os.Getenv("ENV") == "prod"
-	r.Use(pkg.SecurityHeaders(isProd))
-	r.Use(pkg.TimeoutMiddleware(10 * time.Second))
-	r.Use(pkg.BodyLimit(cfg.HTTP))
-
-	// Health / Ready
-	r.GET("/healthz", func(c *gin.Context) { c.Status(http.StatusOK) })
-	r.GET("/readyz", func(c *gin.Context) { c.Status(http.StatusOK) })
+	r := initRouter(cfg, logger)
 
 	// API v1 (auth + rate-limit)
 	api := r.Group("/api/v1")
@@ -98,7 +93,7 @@ func main() {
 
 	swagger, err := handlers.GetSwagger()
 	if err != nil {
-		logger.Error("handlers.GetSwagger: ", "err", err)
+		logger.Error("handlers.GetSwagger: ", slog.Any("err", err))
 		return
 	}
 
@@ -108,7 +103,7 @@ func main() {
 	// load catalog of wod.
 	c, err := catalog.NewCatalog(catalog.Raw)
 	if err != nil {
-		logger.Error("catalog.NewCatalog: ", "err", err)
+		logger.Error("catalog.NewCatalog: ", slog.Any("err", err))
 		return
 	}
 
@@ -124,9 +119,57 @@ func main() {
 		BaseURL: "",
 	})
 
+	// run and shutdown server
+	runServer(ctx, cfg, logger, r)
+}
+
+func initDB(dbCfg config.DBConfig) (*sql.DB, error) {
+	// Construct the data source name (DSN)
+	dataSourceName := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+		dbCfg.USER, dbCfg.PASSWORD, dbCfg.HOST, dbCfg.PORT, dbCfg.NAME, dbCfg.SSLMODE)
+
+	db, err := sql.Open("postgres", dataSourceName)
+	if err != nil {
+		return nil, fmt.Errorf("sql.Open(dbName, url): %w", err)
+	}
+	// test connection
+	if err = db.Ping(); err != nil {
+		return nil, fmt.Errorf("db.Ping: %w", err)
+	}
+
+	return db, nil
+}
+
+func initRouter(cfg config.Config, logger *slog.Logger) *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+
+	err := r.SetTrustedProxies(nil)
+	if err != nil {
+		logger.Warn("SetTrustedProxies: ", slog.Any("err", err))
+	}
+
+	r.Use(pkg.RecoveryMiddleware(logger))
+	r.Use(pkg.RequestID())
+	r.Use(pkg.Logging(logger))
+	r.Use(obs.MetricsMiddleware())
+
+	isProd := os.Getenv("ENV") == "prod"
+	r.Use(pkg.SecurityHeaders(isProd))
+	r.Use(pkg.TimeoutMiddleware(10 * time.Second))
+	r.Use(pkg.BodyLimit(cfg.HTTP))
+
+	// Health / Ready
+	r.GET("/healthz", func(c *gin.Context) { c.Status(http.StatusOK) })
+	r.GET("/readyz", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	return r
+}
+
+func runServer(ctx context.Context, cfg config.Config, logger *slog.Logger, handler http.Handler) {
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(cfg.HTTP.Port),
-		Handler:           r,
+		Handler:           handler,
 		ReadTimeout:       cfg.HTTP.ReadTimeout,
 		ReadHeaderTimeout: 2 * time.Second,
 		WriteTimeout:      cfg.HTTP.WriteTimeout,
@@ -157,21 +200,4 @@ func main() {
 	} else {
 		logger.Info("server stopped")
 	}
-}
-
-func initDB(dbCfg config.DBConfig) (*sql.DB, error) {
-	// Construct the data source name (DSN)
-	dataSourceName := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
-		dbCfg.USER, dbCfg.PASSWORD, dbCfg.HOST, dbCfg.PORT, dbCfg.NAME, dbCfg.SSLMODE)
-
-	db, err := sql.Open("postgres", dataSourceName)
-	if err != nil {
-		return nil, fmt.Errorf("sql.Open(dbName, url): %w", err)
-	}
-	// test connection
-	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("db.Ping: %w", err)
-	}
-
-	return db, nil
 }

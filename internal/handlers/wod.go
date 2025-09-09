@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"net/http"
 
+	"github.com/LinaKACI-pro/wod-gen/internal/common"
 	"github.com/LinaKACI-pro/wod-gen/internal/core"
 	"github.com/bytedance/gopkg/util/logger"
 )
@@ -34,12 +37,28 @@ func (server *Server) GenerateWod(ctx context.Context, req GenerateWodRequestObj
 
 	wod, err := server.wodGenerate.Generate(ctx, string(req.Body.Level), req.Body.DurationMin, equipment, req.Body.Seed)
 	if err != nil {
-		logger.Error("server.wodGenerate.Generate()", "err", err)
+		logger.Error("server.wodGenerate.Generate()", slog.Any("err", err))
 
-		return &GenerateWod400JSONResponse{
-			Code:    http.StatusBadRequest,
-			Message: "invalid request",
-		}, nil
+		var invalidDataErr common.InvalidDataError
+		switch {
+		case errors.As(err, &invalidDataErr):
+			return &GenerateWod400JSONResponse{
+				Code:    http.StatusBadRequest,
+				Message: invalidDataErr.Error(),
+			}, nil
+		case errors.Is(err, common.ErrDuration),
+			errors.Is(err, common.ErrEmptyCatalog),
+			errors.Is(err, common.ErrNoMoves):
+			return &GenerateWod400JSONResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
+			}, nil
+		default:
+			return &GenerateWod500JSONResponse{
+				Code:    http.StatusInternalServerError,
+				Message: "internal server error",
+			}, nil
+		}
 	}
 
 	blocks := make([]Block, len(wod.Blocks))
@@ -71,7 +90,7 @@ func (server *Server) ListWods(ctx context.Context, req ListWodsRequestObject) (
 
 	wods, err := server.wodList.List(ctx, limit, offset)
 	if err != nil {
-		logger.Error("server.wodList.List()", "err", err)
+		logger.Error("server.wodList.List()", slog.Any("err", err))
 		return &ListWods500JSONResponse{
 			Code:    http.StatusInternalServerError,
 			Message: "failed to list wods",

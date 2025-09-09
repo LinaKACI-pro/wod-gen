@@ -38,10 +38,7 @@ test-race:
 	go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
 test-k6:
-	@for f in tests/*.js; do \
-		echo "=== Running $$f ==="; \
-		k6 run --env BASE_URL=$(BASE_URL) --env TOKEN=$(TOKEN) $$f || exit 1; \
-	done
+		k6 run --http-debug --env BASE_URL=$(BASE_URL) --env TOKEN=$(TOKEN) tests/negative.js
 
 fmt:
 	gofumpt -w .

@@ -5,8 +5,7 @@ import (
 )
 
 type AuthConfig struct {
-	JWTSecret string   `env:"AUTH_JWT_SECRET" required:"true"`
-	APIKeys   []string `env:"API_KEYS" required:"true"`
+	JWTSecret string `env:"AUTH_JWT_SECRET" required:"true"`
 }
 
 type RateLimiterConfig struct {
@@ -40,9 +39,8 @@ type DBConfig struct {
 type ObsConfig struct {
 	Enabled      bool   `env:"OBS_ENABLED" envDefault:"false"`
 	OTLPEndpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+	GrafanaToken string `env:"GRAFANA_CLOUD_TOKEN" envDefault:""`
 	OTLPProtocol string `env:"OTEL_EXPORTER_OTLP_PROTOCOL" envDefault:"http/protobuf"`
-	OTLPHeaders  string `env:"OTEL_EXPORTER_OTLP_HEADERS"`
-	OTELResource string `env:"OTEL_RESOURCE_ATTRIBUTES" envDefault:"service.name=hyrox-api,service.version=0.1.0,env=dev"`
 }
 
 type DebugConfig struct {

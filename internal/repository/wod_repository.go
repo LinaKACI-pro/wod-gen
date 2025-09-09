@@ -54,7 +54,7 @@ func (r *WodRepository) ListWods(ctx context.Context, limit, offset int) ([]mode
 	}
 	defer func() {
 		if err = rows.Close(); err != nil {
-			slog.Warn("failed to close rows: ", "err: ", err)
+			slog.Warn("failed to close rows: ", slog.Any("err", err))
 		}
 	}()
 

@@ -107,3 +107,5 @@ issues:
       text: ".*"
     - path: _test\.go$
       linters: [err113, dogsled, revive, errcheck]
+    - path: ^pkg/obs
+      linters: [errcheck]

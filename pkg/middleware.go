@@ -117,7 +117,6 @@ func AuthJWT(m *JWTManager, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		// Stocker l’utilisateur dans le contexte
 		c.Set("sub", claims.Subject)
 		c.Next()
 	}

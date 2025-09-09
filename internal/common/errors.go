@@ -6,7 +6,6 @@ import (
 )
 
 var (
-	ErrMissingBody  = errors.New("missing body")
 	ErrDuration     = errors.New("duration_min must be between 15 and 120")
 	ErrEmptyCatalog = errors.New("empty catalog")
 	ErrNoMoves      = errors.New("no moves available")

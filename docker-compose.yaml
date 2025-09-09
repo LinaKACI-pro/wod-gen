@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - ${PWD}/db/migrations/001_init.up.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ${PWD}/db/migrations:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
@@ -29,7 +29,10 @@ services:
       RATE_LIMITER_STRATEGY: "token"
       RATE_LIMITER_ENABLED: "true"
       AUTH_JWT_SECRET: "10c473fa9972a3934bb87d42438a61124fa3836e102498953cdc198e073e63b2"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "otlp-gateway-prod-eu-west-2.grafana.net:443"
+      GRAFANA_CLOUD_TOKEN: "MTM3MDc0NDpnbGNfZXlKdklqb2lNVFV5T1RZNE1TSXNJbTRpT2lKMGIydGxiaUlzSW1zaU9pSjFPVFpaTkhwVE9UWlFPVEZKUkdwSVdUZHdPSGx6WkRRaUxDSnRJanA3SW5JaU9pSndjbTlrTFdWMUxYZGxjM1F0TWlKOWZRPT0="
       ENV: "dev"
+      OBS_ENABLED: "true"
     depends_on:
       pgsql:
         condition: service_healthy

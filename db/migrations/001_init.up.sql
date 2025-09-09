@@ -1,4 +1,4 @@
-CREATE TABLE wods (
+CREATE TABLE IF NOT EXISTS wods (
     id UUID PRIMARY KEY,
     seed TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -8,5 +8,5 @@ CREATE TABLE wods (
     blocks JSONB NOT NULL
 );
 
-CREATE INDEX idx_wods_seed_level_duration
+CREATE INDEX IF NOT EXISTS idx_wods_seed_level_duration
     ON wods(seed, level, duration_min);
