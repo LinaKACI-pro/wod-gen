@@ -40,8 +40,11 @@ test-k6:
 	fi; \
 	for f in tests/*.js; do \
 		echo "=== Running $$f ==="; \
-		TOKEN=$$($(GEN_JWT)) \
-		k6 run --env BASE_URL=$(BASE_URL) --env TOKEN=$$TOKEN $$f || exit 1; \
+		TOKEN=`$(GEN_JWT)`; \
+		k6 run \
+			--env BASE_URL=$(BASE_URL) \
+			--env TOKEN=$$TOKEN \
+			$$f || exit 1; \
 	done
 
 fmt:

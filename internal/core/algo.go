@@ -1,4 +1,4 @@
-//nolint:gosec // deterministic non-crypto PRNG is intended
+//nolint:gosec // deterministic PRNG is intended
 package core
 
 import (

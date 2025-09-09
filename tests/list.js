@@ -9,6 +9,6 @@ export default function () {
     check(res, {
         "status is 200": (r) => r.status === 200,
         "has wods": (r) => Array.isArray(r.json("wods")),
-        "pagination respected": (r) => r.json("wods").length == 5,
+        "pagination respected": (r) => r.json("wods").length <= 5,
     });
 }

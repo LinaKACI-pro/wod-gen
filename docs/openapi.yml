@@ -175,7 +175,3 @@ components:
         message:
           type: string
           example: "invalid request"
-        request_id:
-          type: string
-          nullable: true
-          example: "b1f6a2d3-..."

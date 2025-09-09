@@ -45,7 +45,7 @@ func NewWodGenerator(catalog *catalog.Catalog, wodRepository repository.WodRepos
 func (w *WodGenerator) Generate(ctx context.Context, level string, durationMin int, equipment []string, seed *string) (models.Wod, error) {
 	lv, parsedSeed, err := validateInfo(level, durationMin, seed, w.catalog.Moves)
 	if err != nil {
-		return models.Wod{}, fmt.Errorf("validateInfo(): %w", err)
+		return models.Wod{}, fmt.Errorf("%w", err)
 	}
 
 	wod, err := buildWod(lv, durationMin, equipment, parsedSeed, w.catalog.Moves)

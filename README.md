@@ -149,7 +149,7 @@ curl -X POST http://localhost:8080/api/v1/wod/generate \
     - Duration-based block allocation (`blocksForDuration`)
 
 - **Security**
-    - Bearer token authentication (API keys, hashed)
+    - Bearer token authentication
     - Rate limiting middleware with configurable strategy
     - Security headers (HSTS, X-Frame-Options, etc.)
 
