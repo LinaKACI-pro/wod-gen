@@ -16,11 +16,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-//  fix Les defaults des tags (default:"20") ne s’appliquent que
-// si ton parseur les gère (caarlos0/env oui, mais uniquement si le tag est env:"..." default:"..." sur la bonne struct).
-//
-// Si ta RateLimiterConfig n’a pas ces tags, ou si la variable n’est pas lue (mauvais nom d’env), tu te retrouves avec 0.
-
 const (
 	Global = "global"
 	Token  = "token"
@@ -51,7 +46,7 @@ func NewLimiter(cfg *config.RateLimiterConfig) *RateLimiter {
 	if cfg.Strategy == Global {
 		rl.global = rate.NewLimiter(rate.Limit(cfg.RequestsPerS), cfg.Burst)
 	}
-	// GC: toutes les max(1m, TTL)
+	// GC: every max(1m, TTL)
 	intv := cfg.TTL
 	if intv < time.Minute {
 		intv = time.Minute
@@ -94,13 +89,13 @@ func (r *RateLimiter) keyFromRequest(c *gin.Context) string {
 			tok := strings.TrimSpace(strings.TrimPrefix(auth, "Bearer "))
 			if tok != "" {
 				sum := sha256.Sum256([]byte(tok))
-				return "tok_" + hex.EncodeToString(sum[:8]) // id court, jamais le token
+				return "tok_" + hex.EncodeToString(sum[:8]) // don't return the token
 			}
 		}
-		// fallback IP si pas de token
+		// fallback IP if no token
 		fallthrough
 	case IP:
-		// Gin sait extraire le bon client IP si TrustProxy est configuré
+		// Gin extract correct client IP if TrustProxy is not configured
 		ip := c.ClientIP()
 		// normalise: on ne garde que l’IP (sans port)
 		if host, _, err := net.SplitHostPort(ip); err == nil {
@@ -121,7 +116,7 @@ func (r *RateLimiter) allowForKey(key string) (bool, time.Duration) {
 	if r.cfg.Strategy == "global" {
 		res := r.global.ReserveN(now, 1)
 		if !res.OK() {
-			// trop de backlog → refuse avec retry ~ 1/RPS
+			// lot of backlog → refuse with retry ~ 1/RPS
 			return false, time.Duration(float64(time.Second) / r.cfg.RequestsPerS)
 		}
 		if d := res.DelayFrom(now); d > 0 {
@@ -132,7 +127,7 @@ func (r *RateLimiter) allowForKey(key string) (bool, time.Duration) {
 		return true, 0
 	}
 
-	// Par clé (ip/token)
+	// with key (ip/token)
 	r.mu.Lock()
 	b, ok := r.buckets[key]
 	if !ok || now.After(b.expires) {
@@ -169,7 +164,7 @@ func (r *RateLimiter) Middleware(logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 		if delay > 0 {
-			// seconds arrondis
+			// round seconds
 			secs := int(delay.Round(time.Second) / time.Second)
 			if secs < 1 {
 				secs = 1

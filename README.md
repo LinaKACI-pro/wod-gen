@@ -20,10 +20,30 @@ cd wod-gen
 
 # run lint & checks
 make lint
-
-# run locally (default port: 8080)
-go run ./cmd/wod-gen
 ```
+
+### 1. Set environment variables
+
+Before starting, you need to define a few required variables in your shell:
+
+```bash
+export AUTH_JWT_SECRET=$(openssl rand -hex 32)
+export POSTGRES_DB=wodgen
+export POSTGRES_USER=postgres
+export POSTGRES_PASSWORD=postgres
+export PORT=8080
+```
+
+### 2. Start services
+
+Run the API + PostgreSQL via Docker Compose:
+
+```bash
+make docker-up
+```
+
+API will be available at [http://localhost:8080](http://localhost:8080).
+
 
 Main environment variables (see `internal/config`):
 
@@ -61,6 +81,13 @@ flyctl deploy
 ```
 
 App will be available at https://wod-gen.fly.dev/.
+
+## 📊 Grafana Observability
+
+The API is instrumented with **OpenTelemetry** to export metrics and traces.  
+These are sent to **Grafana Cloud**, where you can explore requests, latency, errors, and throughput.
+
+👉 Live dashboard: [Grafana Dashboard](https://linakaci.grafana.net/dashboards)
 
 ## 🔌 Endpoints
 

@@ -2,15 +2,15 @@ services:
   pgsql:
     image: postgres:latest
     environment:
-      POSTGRES_DB: wodgen
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ${PWD}/db/migrations:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,16 +23,16 @@ services:
     ports:
       - "8080:8080"
     environment:
-      PORT: "8080"
-      RATE_LIMITER_BURST: "15"
-      RATE_LIMITER_REQUESTS_PER_SECOND: "30"
-      RATE_LIMITER_STRATEGY: "token"
-      RATE_LIMITER_ENABLED: "true"
-      AUTH_JWT_SECRET: "10c473fa9972a3934bb87d42438a61124fa3836e102498953cdc198e073e63b2"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "otlp-gateway-prod-eu-west-2.grafana.net:443"
-      GRAFANA_CLOUD_TOKEN: "MTM3MDc0NDpnbGNfZXlKdklqb2lNVFV5T1RZNE1TSXNJbTRpT2lKMGIydGxiaUlzSW1zaU9pSjFPVFpaTkhwVE9UWlFPVEZKUkdwSVdUZHdPSGx6WkRRaUxDSnRJanA3SW5JaU9pSndjbTlrTFdWMUxYZGxjM1F0TWlKOWZRPT0="
-      ENV: "dev"
-      OBS_ENABLED: "true"
+      PORT: ${PORT}
+      RATE_LIMITER_BURST: ${RATE_LIMITER_BURST}
+      RATE_LIMITER_REQUESTS_PER_SECOND: ${RATE_LIMITER_REQUESTS_PER_SECOND}
+      RATE_LIMITER_STRATEGY: ${RATE_LIMITER_STRATEGY}
+      RATE_LIMITER_ENABLED: ${RATE_LIMITER_ENABLED}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      GRAFANA_CLOUD_TOKEN: ${GRAFANA_CLOUD_TOKEN}
+      ENV: ${ENV}
+      OBS_ENABLED: ${OBS_ENABLED}
     depends_on:
       pgsql:
         condition: service_healthy

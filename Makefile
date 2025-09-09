@@ -1,44 +1,48 @@
-# Load environment variables from .env if the file exists
-include .env.exemple
-export $(shell sed 's/=.*//' .env.exemple)
-
 APP_NAME = wod-gen
 MIGRATION_DIR = db/migrations
+DB_URL ?= ${DB_DSN}
 DOCKER_REGISTRY ?= local
 TAG ?= latest
-LATEST  := latest
 BASE_URL ?= http://localhost:8080/api/v1/wod/generate
-TOKEN ?= eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZXhwIjoxNzU3NDM3NDY4LCJpYXQiOjE3NTczNTEwNjh9.FsE9SDr-StQIGN0b3aOO-89VF8-cI-ohydROaqsd6zM
 
-.PHONY: all build migrate-up migrate-down run run-binary docker-build docker-push docker-run-postgres docker-run-app docker-run docker-compose-dev docker-compose-prod test-k6 clean
+USER ?= user123
+GEN_JWT = AUTH_JWT_SECRET=$$AUTH_JWT_SECRET go run ./cmd/gen-jwt/main.go $(USER)
+
+.PHONY: all build migrate-up migrate-down run docker-build docker-up docker-down test test-race test-k6 fmt vet lint clean gen-api tools
 
 all: build migrate-up run
 
 tools:
-	@echo "==> Installing tools"
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(LATEST)
-	@go install mvdan.cc/gofumpt@$(LATEST)
-	@go install golang.org/x/vuln/cmd/govulncheck@$(LATEST)
-	@go install github.com/kisielk/errcheck@$(LATEST)
-	@go install mvdan.cc/gofumpt@$(LATEST)
-	@go install github.com/daixiang0/gci@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install mvdan.cc/gofumpt@latest
+	go install golang.org/x/vuln/cmd/govulncheck@latest
+	go install github.com/kisielk/errcheck@latest
+	go install github.com/daixiang0/gci@latest
 
 migrate-up:
-	goose -dir ${MIGRATION_DIR} postgres "${DB_DSN}" up
+	migrate -path $(MIGRATION_DIR) -database "$(DB_URL)" up
 	@echo "Migrations applied successfully!"
 
 migrate-down:
-	goose -dir ${MIGRATION_DIR} postgres "${DB_DSN}" down
+	migrate -path $(MIGRATION_DIR) -database "$(DB_URL)" down
 	@echo "Migrations reverted successfully!"
 
 test:
 	go test -coverprofile=coverage.out -covermode=atomic ./...
 
 test-race:
-	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
 test-k6:
-		k6 run --http-debug --env BASE_URL=$(BASE_URL) --env TOKEN=$(TOKEN) tests/negative.js
+	@if [ -z "$$AUTH_JWT_SECRET" ]; then \
+		echo "AUTH_JWT_SECRET is not set. Run: make test-k6 AUTH_JWT_SECRET=xxxx"; \
+		exit 1; \
+	fi; \
+	for f in tests/*.js; do \
+		echo "=== Running $$f ==="; \
+		TOKEN=$$($(GEN_JWT)) \
+		k6 run --env BASE_URL=$(BASE_URL) --env TOKEN=$$TOKEN $$f || exit 1; \
+	done
 
 fmt:
 	gofumpt -w .
@@ -49,22 +53,12 @@ vet:
 	go vet ./...
 
 lint:
-	@echo "-> golangci-lint"
-	@golangci-lint config verify -c golangci.yml
-	@golangci-lint run -c golangci.yml ./...
-	@echo "-> govulncheck"; command -v govulncheck >/dev/null 2>&1 && govulncheck ./... || true
+	golangci-lint config verify -c golangci.yml
+	golangci-lint run -c golangci.yml ./...
+	command -v govulncheck >/dev/null 2>&1 && govulncheck ./... || true
 
-# Docker targets
 docker-build:
-	docker build -f build/Dockerfile -t wod-gen:local .
-
-docker-run:
-	docker run --rm -p 8080:8080 \
-		-e PORT=8080 \
-		-e API_KEYS=devkey \
-		-e RATE_LIMIT_STRATEGY=token \
-		-e ENV=dev \
-		wod-gen:local
+	docker build -f build/Dockerfile -t $(APP_NAME):local .
 
 docker-up:
 	docker compose up --build
@@ -72,17 +66,11 @@ docker-up:
 docker-down:
 	docker compose down
 
-# Clean up
 clean:
-	@echo "Stopping and removing containers..."
-	docker stop $(APP_NAME) user-service-postgres || true
-	docker rm $(APP_NAME) user-service-postgres || true
-	@echo "Removing Docker image..."
+	docker stop $(APP_NAME) postgres || true
+	docker rm $(APP_NAME) postgres || true
 	docker rmi $(DOCKER_REGISTRY)/$(APP_NAME):$(TAG) || true
-	@echo "Removing built binary..."
 	rm -rf bin/$(APP_NAME)
-	@echo "Cleanup completed!"
 
 gen-api:
-	cd docs
-	go generate ./...
+	cd docs && go generate ./...

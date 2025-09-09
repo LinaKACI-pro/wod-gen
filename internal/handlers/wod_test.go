@@ -85,7 +85,7 @@ func TestGenerateWod_ErrorKnown_InvalidData(t *testing.T) {
 
 	r := resp.(*handlers.GenerateWod400JSONResponse)
 	require.Equal(t, 400, r.Code)
-	require.Contains(t, r.Message, "level") // message explicite
+	require.Contains(t, r.Message, "level")
 }
 
 func TestGenerateWod_ErrorKnown_NoMoves(t *testing.T) {

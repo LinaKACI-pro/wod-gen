@@ -27,7 +27,6 @@ func newWod() models.Wod {
 
 func TestSaveWod_Success(t *testing.T) {
 	db, mock, _ := sqlmock.New()
-	defer db.Close()
 
 	wod := newWod()
 	mock.ExpectExec("INSERT INTO wods").
@@ -43,7 +42,6 @@ func TestSaveWod_Success(t *testing.T) {
 
 func TestSaveWod_DBError(t *testing.T) {
 	db, mock, _ := sqlmock.New()
-	defer db.Close()
 
 	wod := newWod()
 	mock.ExpectExec(`INSERT INTO wods`).
@@ -58,7 +56,6 @@ func TestSaveWod_DBError(t *testing.T) {
 
 func TestListWods_Success(t *testing.T) {
 	db, mock, _ := sqlmock.New()
-	defer db.Close()
 
 	wod := newWod()
 	blocks := `[{"name":"Run","params":{"meters":200}}]`
@@ -80,7 +77,6 @@ func TestListWods_Success(t *testing.T) {
 
 func TestListWods_QueryError(t *testing.T) {
 	db, mock, _ := sqlmock.New()
-	defer db.Close()
 
 	mock.ExpectQuery("SELECT id, seed").
 		WillReturnError(errors.New("db fail"))
